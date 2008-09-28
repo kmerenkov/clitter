@@ -49,13 +49,13 @@ class Clitter(object):
         self.credentials = None
 
     def print_warning(self, text):
-        self.term.render("${YELLOW}%s${NORMAL}" % text)
+        print self.term.render("${YELLOW}%s${NORMAL}" % text)
 
     def print_error(self, text):
-        self.term.render("${RED}%s${NORMAL}" % text)
+        print self.term.render("${RED}%s${NORMAL}" % text)
 
     def print_highlight(self, text):
-        self.term.render("${GREEN}%s${NORMAL}" % text)
+        print self.term.render("${GREEN}%s${NORMAL}" % text)
 
     def read_config(self):
         config = RawConfigParser()
