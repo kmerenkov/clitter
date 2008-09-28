@@ -34,4 +34,5 @@ setup(name='clitter',
       author_email='kmerenkov@gmail.com',
       url='...',
       packages=['twitter'],
+      py_modules=['terminal_controller'],
       scripts=['clitter'])
