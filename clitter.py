@@ -31,6 +31,7 @@ import twitter
 from ConfigParser import RawConfigParser
 import os
 from pprint import pprint
+from terminal_controller import TerminalController
 
 
 usage = \
@@ -42,20 +43,32 @@ usage = \
 
 class Clitter(object):
     def __init__(self):
+        self.term = TerminalController()
         self.verbose = False
         self.command = None
         self.credentials = None
 
+    def print_warning(self, text):
+        self.term.render("${YELLOW}%s${NORMAL}" % text)
+
+    def print_error(self, text):
+        self.term.render("${RED}%s${NORMAL}" % text)
+
+    def print_highlight(self, text):
+        self.term.render("${GREEN}%s${NORMAL}" % text)
+
     def read_config(self):
         config = RawConfigParser()
         cfg_path = os.path.expanduser("~/.clitter")
-        config.read([cfg_path])
+        if not len(config.read([cfg_path])):
+            self.print_error("Could not read config from: %s" % cfg_path)
+            self.quit(1)
         user = config.get("auth", "username")
         password = config.get("auth", "password")
         self.credentials = [user, password]
 
-    def quit(self, status):
-        if status != 0:
+    def quit(self, status, print_usage=True):
+        if print_usage:
             print usage
         sys.exit(status)
 
@@ -88,24 +101,24 @@ class Clitter(object):
         api = twitter.APIRequest(self.credentials[0], self.credentials[1])
         json = api.destroy(status_id)
         if json.has_key("id"):
-            print "Destroyed status %d" % json["id"]
+            self.print_highlight("Destroyed status %d" % json["id"])
         else:
-            print "Failed to destroy status %d, response was:" % int(status_id)
+            self.print_error("Failed to destroy status %d, response was:" % int(status_id))
             pprint(json)
 
     def command_fetch(self):
-        pass
+        self.print_error("Not implemented yet")
 
     def command_add(self):
         status = sys.argv[2]
+        self.print_highlight("Updating your status ...")
         api = twitter.APIRequest(self.credentials[0], self.credentials[1])
         json = api.update(status)
         if json.has_key("id"):
-            print "Updated your status, id is %d" % json["id"]
+            self.print_highlight("Updated your status, id is %d" % json["id"])
         else:
-            print "Failed to update your status, response was:"
+            self.print_error("Failed to update your status, response was:")
             pprint(json)
-
 
 
 if __name__ == '__main__':
