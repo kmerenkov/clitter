@@ -31,7 +31,7 @@ import twitter
 from ConfigParser import RawConfigParser
 import os
 from pprint import pprint
-from terminal_controller import TerminalController
+import terminal_controller
 
 
 usage = \
@@ -43,7 +43,7 @@ usage = \
 
 class Clitter(object):
     def __init__(self):
-        self.term = TerminalController()
+        self.term = terminal_controller.TerminalController()
         self.verbose = False
         self.command = None
         self.credentials = None
