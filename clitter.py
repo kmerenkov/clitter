@@ -101,7 +101,7 @@ class Clitter(object):
         api = twitter.APIRequest(self.credentials[0], self.credentials[1])
         json = api.destroy(status_id)
         if json.has_key("id"):
-            self.print_highlight("Destroyed status %d" % json["id"])
+            self.print_warning("Destroyed status %d" % json["id"])
         else:
             self.print_error("Failed to destroy status %d, response was:" % int(status_id))
             pprint(json)
@@ -115,7 +115,7 @@ class Clitter(object):
         api = twitter.APIRequest(self.credentials[0], self.credentials[1])
         json = api.update(status)
         if json.has_key("id"):
-            self.print_highlight("Updated your status, id is %d" % json["id"])
+            self.print_warning("Updated your status, id is %d" % json["id"])
         else:
             self.print_error("Failed to update your status, response was:")
             pprint(json)
