@@ -81,6 +81,8 @@ class Clitter(object):
             self.quit(1)
         username = config.get("auth", "username")
         password = config.get("auth", "password")
+        for option in config.options("core"):
+            self.settings[option] = config.get("core", option)
         self.username = username
         self.password = password
 
@@ -105,7 +107,6 @@ class Clitter(object):
     def main(self):
         self.parse_args()
         self.read_config()
-        self.command = sys.argv[1]
         self.handle_command()
 
     def handle_command(self):
