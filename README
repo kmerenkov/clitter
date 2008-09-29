@@ -5,3 +5,8 @@ Clitter is a command-line twitter client.
 ==== Why ====
 
 Most of my time I spend in terminal, so I need an easy-to-use tool, and which is always near me.
+
+==== Abilities ====
+ * update your status
+ * fetch your status, fetch status of other people
+ * save fetch responses into database (bsddb) and ask server about recent changes only
