@@ -96,6 +96,10 @@ class Clitter(object):
         check_args(2)
         if sys.argv[1] in ["a", "d"]:
             check_args(3)
+        elif sys.argv[1] in ["fu"]:
+            pass
+        else:
+            self.quit(1)
         self.command = sys.argv[1]
 
     def main(self):
