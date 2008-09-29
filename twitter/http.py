@@ -31,7 +31,11 @@ from datetime import datetime
 
 
 def http_data(data):
-    str_data = "&".join(["%s=%s" % (k,v) for k,v in data.iteritems()])
+    processed_data = {}
+    for k,v in data.iteritems():
+        if v is not None:
+            processed_data[k] = v
+    str_data = "&".join(["%s=%s" % (k,v) for k,v in processed_data.iteritems()])
     return urllib.quote(str_data)
 
 def make_request(url, username='', password='', data={}, method='GET'):
@@ -58,7 +62,7 @@ def make_request(url, username='', password='', data={}, method='GET'):
         return retdata
     except urllib2.HTTPError, e:
         print e
-        retval = ''
+        retval = '{}'
     return retval
 
 def GET(url, username='', password='', data={}):
