@@ -31,6 +31,7 @@ import twitter
 from ConfigParser import RawConfigParser
 import os
 from pprint import pprint
+from datetime import datetime
 import terminal_controller
 
 
@@ -38,7 +39,7 @@ usage = \
 """Usage:
       a <status>    - update your status
       d <id>        - destroy status by id
-      f [user_id]   - fetch user statuses by user_id
+      fu [user_id]  - fetch user statuses by user_id
                       (if user_id is ommiitted, fetch your own statuses)"""
 
 class Clitter(object):
@@ -48,6 +49,9 @@ class Clitter(object):
         self.command = None
         self.username = None
         self.password = None
+        self.settings = {
+            'timeline_date_format': '%Y.%m.%d %H:%M:%S'
+            }
 
     def print_warning(self, text):
         print self.term.render("${YELLOW}%s${NORMAL}" % text)
@@ -57,6 +61,17 @@ class Clitter(object):
 
     def print_highlight(self, text):
         print self.term.render("${GREEN}%s${NORMAL}" % text)
+
+    def print_timeline(self, date, text):
+        date = self.process_date(date)
+        print self.term.render("${YELLOW}%s${NORMAL}: %s" % (date, text))
+
+    def process_date(self, date):
+        date = self.parse_date(date)
+        return date.strftime(self.settings['timeline_date_format'])
+
+    def parse_date(self, date):
+        return datetime.strptime(date, "%a %b %d %H:%M:%S +0000 %Y")
 
     def read_config(self):
         config = RawConfigParser()
@@ -92,8 +107,8 @@ class Clitter(object):
     def handle_command(self):
         if self.command == "a":
             self.command_add()
-        elif self.command == "f":
-            self.command_fetch()
+        elif self.command == "fu":
+            self.command_fetch_user_timeline()
         elif self.command == "d":
             self.command_destroy()
         else:
@@ -110,7 +125,7 @@ class Clitter(object):
             self.print_error("Failed to destroy status %d, response was:" % int(status_id))
             pprint(json)
 
-    def command_fetch(self):
+    def command_fetch_user_timeline(self):
         if len(sys.argv) > 2:
             screenname = sys.argv[2]
         else:
@@ -121,8 +136,7 @@ class Clitter(object):
         if len(json):
             # it is a list of dictionaries
             for status in json:
-                line = self.term.render("${YELLOW}%s${NORMAL}: %s" % (status['created_at'], status['text']))
-                print line
+                self.print_timeline(status['created_at'], status['text'])
         else:
             self.print_error("Failed to fetch statuses, response was:")
             pprint(json)
