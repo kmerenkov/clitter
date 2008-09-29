@@ -34,6 +34,8 @@ from pprint import pprint
 from datetime import datetime
 import terminal_controller
 import shelve
+from getpass import getpass
+
 
 usage = \
 """Usage:
@@ -42,6 +44,7 @@ usage = \
       fu [user_id]  - fetch user statuses by user_id
                       (if user_id is ommiitted, fetch your own statuses)
       r             - get rate_limit_status information"""
+
 
 class ObjectsPersistance(object):
     def __init__(self, filename):
@@ -65,17 +68,72 @@ class ObjectsPersistance(object):
         self.shelve[name] = data
         self.shelve.close()
 
+
+class Config(object):
+    def __init__(self, filename='~/.clitter'):
+        self.filename = os.path.expanduser(filename)
+        self.config = None
+        self.params_ask = ['twitter.username', 'twitter.password']
+        self.defaults = {
+            'twitter.timeline_date_format': '%Y.%m.%d %H:%M:%S',
+            'twitter.username': '',
+            'twitter.password': '',
+            }
+
+    def __open_config(self):
+        f = open(self.filename, 'w+')
+        return f
+
+    def read(self):
+        self.config = RawConfigParser()
+        if not self.config.read([self.filename]):
+            f = self.__open_config()
+            f.write('')
+            f.close()
+            self.read()
+
+    def sync(self):
+        f = self.__open_config()
+        self.config.write(f)
+        f.close()
+
+    def __getitem__(self, item):
+        section, name = item.split(".")
+        if not all([section, name]):
+            return None
+        if self.config.has_section(section) and self.config.has_option(section, name):
+            return self.config.get(section, name)
+        else:
+            if item in self.params_ask:
+                if "password" in item:
+                    val = getpass("Please enter %s: " % name)
+                else:
+                    val = raw_input("Please enter %s: " % name)
+                if val:
+                    self[item] = val
+                    self.sync()
+                    return val
+                else:
+                    if item in self.defaults:
+                        return self.defaults[item]
+            return None
+
+    def __setitem__(self, item, value):
+        section, name = item.split(".")
+        if not all([section, name]):
+            return None
+        if not self.config.has_section(section):
+            self.config.add_section(section)
+        self.config.set(section, name, value)
+
+
 class Clitter(object):
     def __init__(self):
         self.term = terminal_controller.TerminalController()
         self.verbose = False
         self.command = None
         self.shelve = ObjectsPersistance(os.path.expanduser("~/.clitter.db"))
-        self.settings = {
-            'twitter.timeline_date_format': '%Y.%m.%d %H:%M:%S',
-            'twitter.username': '',
-            'twitter.password': '',
-            }
+        self.config = Config()
 
     def print_warning(self, text):
         print self.term.render("${YELLOW}%s${NORMAL}" % text)
@@ -83,7 +141,7 @@ class Clitter(object):
     def print_error(self, text):
         print self.term.render("${RED}%s${NORMAL}" % text)
 
-    def print_highlight(self, text):
+    def print_progress(self, text):
         print self.term.render("${GREEN}%s${NORMAL}" % text)
 
     def print_timeline(self, date, text):
@@ -92,34 +150,10 @@ class Clitter(object):
 
     def process_date(self, date):
         date = self.parse_date(date)
-        return date.strftime(self.settings['twitter.timeline_date_format'])
+        return date.strftime(self.config['twitter.timeline_date_format'])
 
     def parse_date(self, date):
         return datetime.strptime(date, "%a %b %d %H:%M:%S +0000 %Y")
-
-    def fill_in_settings(self, config, section, vital_options=[], strict=True):
-        if config.has_section(section):
-            for option in config.options(section):
-                if option in vital_options:
-                    del vital_options[vital_options.index(option)]
-                self.settings["%s.%s" % (section, option)] = config.get(section, option)
-            if len(vital_options):
-                self.print_error("You must define the following parameters in your configuration file:")
-                self.print_error("\t%s" % ", ".join(map(lambda x: "\"%s\"" % x, vital_options)))
-                sys.exit(1)
-        else:
-            if strict:
-                self.print_error("You must have section \"%s\" in your configuration file." % section)
-                sys.exit(1)
-
-    def read_config(self):
-        config = RawConfigParser()
-        cfg_path = os.path.expanduser("~/.clitter")
-        if not len(config.read([cfg_path])):
-            self.print_error("Could not read config from: %s" % cfg_path)
-            self.quit(1)
-        self.fill_in_settings(config, "twitter", ["username", "password"], True)
-        self.fill_in_settings(config, "core", strict=False)
 
     def quit(self, status, print_usage=True):
         if print_usage:
@@ -141,8 +175,7 @@ class Clitter(object):
 
     def main(self):
         self.parse_args()
-        self.read_config()
-        self.api = twitter.APIRequest(self.settings['twitter.username'], self.settings['twitter.password'])
+        self.config.read()
         self.handle_command()
 
     def handle_command(self):
@@ -158,8 +191,9 @@ class Clitter(object):
             assert "Unknown command %s" % self.command
 
     def command_rate_limit_status(self):
-        self.print_highlight("Retrieving rate limit status...")
-        json = self.api.get_rate_limit_status()
+        api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
+        self.print_progress("Retrieving rate limit status...")
+        json = api.get_rate_limit_status()
         if json.has_key("hourly_limit"):
             self.print_warning("Hits: %d/%d" % (json["remaining_hits"], json["hourly_limit"]))
         else:
@@ -167,9 +201,10 @@ class Clitter(object):
             pprint(json)
 
     def command_destroy(self):
+        api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
         status_id = sys.argv[2]
-        self.print_highlight("Deleting status...")
-        json = self.api.destroy(status_id)
+        self.print_progress("Deleting status...")
+        json = api.destroy(status_id)
         if json.has_key("id"):
             self.print_warning("Destroyed status %d" % json["id"])
         else:
@@ -180,14 +215,15 @@ class Clitter(object):
         if len(sys.argv) > 2:
             screenname = sys.argv[2]
         else:
-            screenname = self.settings['twitter.username']
-        self.print_highlight("Fetching statuses for id %s" % screenname)
+            screenname = self.config['twitter.username']
+        api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
+        self.print_progress("Fetching statuses for id %s" % screenname)
         # pick up last entry
         prev_timeline = self.shelve.get("user_timeline")
         since = None
         if prev_timeline:
             since = prev_timeline[0]['created_at']
-        json = self.api.get_user_timeline(screenname, since=since)
+        json = api.get_user_timeline(screenname, since=since)
         if prev_timeline and len(json):
             if json[0] != prev_timeline[0]:
                 json = json+prev_timeline
@@ -203,9 +239,10 @@ class Clitter(object):
             pprint(json)
 
     def command_add(self):
+        api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
         status = sys.argv[2]
-        self.print_highlight("Updating status ...")
-        json = self.api.update(status)
+        self.print_progress("Updating status ...")
+        json = api.update(status)
         if json.has_key("id"):
             self.print_warning("Updated your status, id is %d" % json["id"])
         else:
