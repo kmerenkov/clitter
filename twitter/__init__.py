@@ -130,6 +130,6 @@ class APIRequest(object):
             user_id = "id=%s" % user_id
         else:
             user_id = "id=%s" % self.username
-        got_data = request_get("%s/%s" % (url, user_id))
+        got_data = request_get("%s?%s" % (url, user_id))
         json = cjson.decode(got_data)
         return json

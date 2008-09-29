@@ -46,7 +46,8 @@ class Clitter(object):
         self.term = terminal_controller.TerminalController()
         self.verbose = False
         self.command = None
-        self.credentials = None
+        self.username = None
+        self.password = None
 
     def print_warning(self, text):
         print self.term.render("${YELLOW}%s${NORMAL}" % text)
@@ -63,9 +64,10 @@ class Clitter(object):
         if not len(config.read([cfg_path])):
             self.print_error("Could not read config from: %s" % cfg_path)
             self.quit(1)
-        user = config.get("auth", "username")
+        username = config.get("auth", "username")
         password = config.get("auth", "password")
-        self.credentials = [user, password]
+        self.username = username
+        self.password = password
 
     def quit(self, status, print_usage=True):
         if print_usage:
@@ -73,12 +75,13 @@ class Clitter(object):
         sys.exit(status)
 
     def parse_args(self):
-        if len(sys.argv) != 3:
-            self.quit(1)
-        if sys.argv[1] in ["a", "d", "f"]:
-            self.command = sys.argv[1]
-        else:
-            self.quit(1)
+        def check_args(required):
+            if len(sys.argv) < required:
+                self.quit(1)
+        check_args(2)
+        if sys.argv[1] in ["a", "d"]:
+            check_args(3)
+        self.command = sys.argv[1]
 
     def main(self):
         self.parse_args()
@@ -98,7 +101,8 @@ class Clitter(object):
 
     def command_destroy(self):
         status_id = sys.argv[2]
-        api = twitter.APIRequest(self.credentials[0], self.credentials[1])
+        self.print_highlight("Deleting status...")
+        api = twitter.APIRequest(self.username, self.password)
         json = api.destroy(status_id)
         if json.has_key("id"):
             self.print_warning("Destroyed status %d" % json["id"])
@@ -107,12 +111,26 @@ class Clitter(object):
             pprint(json)
 
     def command_fetch(self):
-        self.print_error("Not implemented yet")
+        if len(sys.argv) > 2:
+            screenname = sys.argv[2]
+        else:
+            screenname = self.username
+        self.print_highlight("Fetching statuses for id %s" % screenname)
+        api = twitter.APIRequest(self.username, self.password)
+        json = api.get_user_timeline(screenname)
+        if len(json):
+            # it is a list of dictionaries
+            for status in json:
+                line = self.term.render("${YELLOW}%s${NORMAL}: %s" % (status['created_at'], status['text']))
+                print line
+        else:
+            self.print_error("Failed to fetch statuses, response was:")
+            pprint(json)
 
     def command_add(self):
         status = sys.argv[2]
-        self.print_highlight("Updating your status ...")
-        api = twitter.APIRequest(self.credentials[0], self.credentials[1])
+        self.print_highlight("Updating status ...")
+        api = twitter.APIRequest(self.username, self.password)
         json = api.update(status)
         if json.has_key("id"):
             self.print_warning("Updated your status, id is %d" % json["id"])
