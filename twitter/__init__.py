@@ -29,6 +29,7 @@
 import urllib
 import urllib2
 import cjson
+from datetime import datetime
 
 twitter_url_prefix = 'http://twitter.com/statuses/'
 
@@ -72,6 +73,12 @@ class APIRequest(object):
     def __init__(self, username='', password=''):
         self.username = username
         self.password = password
+
+    def http_date(self, date):
+        # Tue%2C+27+Mar+2007+22%3A55%3A48+GMT
+        parsed_date = datetime.strptime(date, "%a %b %d %H:%M:%S +0000 %Y")
+        http_date = datetime.strftime(parsed_date, "%b, %d %a %Y %H:%M:%S GMT")
+        return urllib.quote_plus(http_date)
 
     def get_public_timeline(self):
         url = "%s%s" % (twitter_url_prefix, "public_timeline.json")
@@ -126,10 +133,14 @@ class APIRequest(object):
         if not all([self.username, self.password]):
             raise NotAuthorizedError("Both username and password required")
         url = "%s%s" % (twitter_url_prefix, "user_timeline.json")
+        options = ""
         if user_id is not None:
             user_id = "id=%s" % user_id
         else:
             user_id = "id=%s" % self.username
-        got_data = request_get("%s?%s" % (url, user_id))
+        if since is not None:
+            since = "since=%s" % self.http_date(since)
+        options = "&".join(filter(lambda x: x is not None, [user_id, since, count, since_id, page]))
+        got_data = request_get("%s?%s" % (url, options))
         json = cjson.decode(got_data)
         return json

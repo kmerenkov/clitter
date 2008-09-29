@@ -33,7 +33,7 @@ import os
 from pprint import pprint
 from datetime import datetime
 import terminal_controller
-
+import shelve
 
 usage = \
 """Usage:
@@ -42,6 +42,28 @@ usage = \
       fu [user_id]  - fetch user statuses by user_id
                       (if user_id is ommiitted, fetch your own statuses)"""
 
+class ObjectsPersistance(object):
+    def __init__(self, filename):
+        self.filename = filename
+        self.shelve = None
+
+    def open(self):
+        self.shelve = shelve.open(self.filename)
+
+    def get(self, name):
+        self.open()
+        if self.shelve.has_key(name):
+            retval = self.shelve[name]
+        else:
+            retval = ''
+        self.shelve.close()
+        return retval
+
+    def set(self, name, data):
+        self.open()
+        self.shelve[name] = data
+        self.shelve.close()
+
 class Clitter(object):
     def __init__(self):
         self.term = terminal_controller.TerminalController()
@@ -49,6 +71,7 @@ class Clitter(object):
         self.command = None
         self.username = None
         self.password = None
+        self.shelve = ObjectsPersistance(os.path.expanduser("~/.clitter.db"))
         self.settings = {
             'timeline_date_format': '%Y.%m.%d %H:%M:%S'
             }
@@ -136,9 +159,17 @@ class Clitter(object):
         else:
             screenname = self.username
         self.print_highlight("Fetching statuses for id %s" % screenname)
+        # pick up last entry
+        prev_timeline = self.shelve.get("user_timeline")
+        since = None
+        if prev_timeline:
+            since = prev_timeline[0]['created_at']
         api = twitter.APIRequest(self.username, self.password)
-        json = api.get_user_timeline(screenname)
+        json = api.get_user_timeline(screenname, since=since)
+        if prev_timeline:
+            json = json + prev_timeline
         if len(json):
+            self.shelve.set("user_timeline", json)
             # it is a list of dictionaries
             for status in json:
                 self.print_timeline(status['created_at'], status['text'])
