@@ -175,8 +175,11 @@ class Clitter(object):
             since = prev_timeline[0]['created_at']
         api = twitter.APIRequest(self.settings['twitter.username'], self.settings['twitter.password'])
         json = api.get_user_timeline(screenname, since=since)
-        if prev_timeline:
-            json = json + prev_timeline
+        if prev_timeline and len(json):
+            if json[0] != prev_timeline[0]:
+                json = json+prev_timeline
+        if prev_timeline and not len(json):
+            json = prev_timeline
         if len(json):
             self.shelve.set("user_timeline", json)
             # it is a list of dictionaries
