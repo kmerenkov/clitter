@@ -43,7 +43,9 @@ usage = \
       d <id>        - destroy status by id
       fu [user_id]  - fetch user statuses by user_id
                       (if user_id is ommiitted, fetch your own statuses)
-      r             - get rate_limit_status information"""
+      r             - get rate_limit_status information
+      --nocached    - don't print cached data
+      -q --quiet    - print results only"""
 
 
 class ObjectsPersistance(object):
@@ -113,9 +115,8 @@ class Config(object):
                     self[item] = val
                     self.sync()
                     return val
-                else:
-                    if item in self.defaults:
-                        return self.defaults[item]
+            if item in self.defaults:
+                return self.defaults[item]
             return None
 
     def __setitem__(self, item, value):
@@ -131,22 +132,25 @@ class Clitter(object):
     def __init__(self):
         self.term = terminal_controller.TerminalController()
         self.verbose = False
+        self.ommit_storage = False
+        self.quiet = False
         self.command = None
         self.shelve = ObjectsPersistance(os.path.expanduser("~/.clitter.db"))
         self.config = Config()
 
-    def print_warning(self, text):
-        print self.term.render("${YELLOW}%s${NORMAL}" % text)
+    def print_data(self, text):
+        print self.term.render(u"${YELLOW}%s${NORMAL}" % text)
 
     def print_error(self, text):
-        print self.term.render("${RED}%s${NORMAL}" % text)
+        print self.term.render(u"${RED}%s${NORMAL}" % text)
 
     def print_progress(self, text):
-        print self.term.render("${GREEN}%s${NORMAL}" % text)
+        if not self.quiet:
+            print self.term.render(u"${GREEN}%s${NORMAL}" % text)
 
     def print_timeline(self, date, text):
         date = self.process_date(date)
-        print self.term.render("${YELLOW}%s${NORMAL}: %s" % (date, text))
+        print self.term.render(u"${YELLOW}%s${NORMAL}: %s" % (date, text))
 
     def process_date(self, date):
         date = self.parse_date(date)
@@ -161,6 +165,7 @@ class Clitter(object):
         sys.exit(status)
 
     def parse_args(self):
+        # NOTE optparse is on its way!
         def check_args(required):
             if len(sys.argv) < required:
                 self.quit(1)
@@ -171,6 +176,11 @@ class Clitter(object):
             pass
         else:
             self.quit(1)
+        args = sys.argv[1:]
+        if "--nocache" in args:
+            self.ommit_storage = True
+        if "--quiet" in args or "-q" in args:
+            self.quiet = True
         self.command = sys.argv[1]
 
     def main(self):
@@ -195,7 +205,7 @@ class Clitter(object):
         self.print_progress("Retrieving rate limit status...")
         json = api.get_rate_limit_status()
         if json.has_key("hourly_limit"):
-            self.print_warning("Hits: %d/%d" % (json["remaining_hits"], json["hourly_limit"]))
+            self.print_data("Hits: %d/%d" % (json["remaining_hits"], json["hourly_limit"]))
         else:
             self.print_error("Failed to retrieve rate limit status, response was:")
             pprint(json)
@@ -206,7 +216,7 @@ class Clitter(object):
         self.print_progress("Deleting status...")
         json = api.destroy(status_id)
         if json.has_key("id"):
-            self.print_warning("Destroyed status %d" % json["id"])
+            self.print_data("Destroyed status %d" % json["id"])
         else:
             self.print_error("Failed to destroy status %d, response was:" % int(status_id))
             pprint(json)
@@ -219,18 +229,23 @@ class Clitter(object):
         api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
         self.print_progress("Fetching statuses for id %s" % screenname)
         # pick up last entry
-        prev_timeline = self.shelve.get("user_timeline")
-        since = None
+        json = []
+        since_id = None
+        prev_timeline = self.shelve.get("user_timeline/%s" % screenname)
         if prev_timeline:
-            since = prev_timeline[0]['created_at']
-        json = api.get_user_timeline(screenname, since=since)
-        if prev_timeline and len(json):
-            if json[0] != prev_timeline[0]:
-                json = json+prev_timeline
-        if prev_timeline and not len(json):
-            json = prev_timeline
-        if len(json):
-            self.shelve.set("user_timeline", json)
+            since_id = prev_timeline[0]['id']
+        json = api.get_user_timeline(screenname, since_id=since_id)
+        if not self.ommit_storage:
+            if prev_timeline and len(json):
+                if json[0] != prev_timeline[0]:
+                    json = json + prev_timeline
+            if prev_timeline and not len(json):
+                json = prev_timeline
+        if isinstance(json, list):
+            if prev_timeline:
+                self.shelve.set("user_timeline/%s" % screenname, prev_timeline + json)
+            else:
+                self.shelve.set("user_timeline/%s" % screenname, json)
             # it is a list of dictionaries
             for status in json:
                 self.print_timeline(status['created_at'], status['text'])
@@ -244,7 +259,7 @@ class Clitter(object):
         self.print_progress("Updating status ...")
         json = api.update(status)
         if json.has_key("id"):
-            self.print_warning("Updated your status, id is %d" % json["id"])
+            self.print_data("Updated your status, id is %d" % json["id"])
         else:
             self.print_error("Failed to update your status, response was:")
             pprint(json)

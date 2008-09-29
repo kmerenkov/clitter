@@ -34,15 +34,16 @@ def http_data(data):
     processed_data = {}
     for k,v in data.iteritems():
         if v is not None:
-            processed_data[k] = v
-    str_data = "&".join(["%s=%s" % (k,v) for k,v in processed_data.iteritems()])
-    return urllib.quote(str_data)
+            processed_data[k] = str(v)
+    str_data = "&".join(["%s=%s" % (k,urllib.quote_plus(v)) for k,v in processed_data.iteritems()])
+    return str_data
 
 def make_request(url, username='', password='', data={}, method='GET'):
     str_data = http_data(data)
     if method == "GET":
-        url = "%s?%s" % (url, str_data)
-    print "%s %s" % (method, url)
+        if str_data:
+            url = "%s?%s" % (url, str_data)
+    # print "%s %s" % (method, url)
     if username and password:
         http_handler = urllib2.HTTPBasicAuthHandler()
         http_handler.add_password(realm='Twitter API',
@@ -74,5 +75,5 @@ def POST(url, username='', password='', data={}):
 def http_date(date):
     # Tue%2C+27+Mar+2007+22%3A55%3A48+GMT
     parsed_date = datetime.strptime(date, "%a %b %d %H:%M:%S +0000 %Y")
-    http_date = datetime.strftime(parsed_date, "%b, %d %a %Y %H:%M:%S GMT")
-    return urllib.quote_plus(http_date)
+    retval = datetime.strftime(parsed_date, "%b, %d %a %Y %H:%M:%S GMT")
+    return retval

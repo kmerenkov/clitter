@@ -93,7 +93,9 @@ class APIRequest(object):
             data['id'] = self.username
         if since is not None:
             data['since'] = http.http_date(since)
-        got_data = http.GET(url, data={'since': since})
+        if since_id is not None:
+            data['since_id'] = since_id
+        got_data = http.GET(url, self.username, self.password, data)
         parsed_json = json.decode(got_data)
         return parsed_json
 
