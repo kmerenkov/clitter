@@ -69,11 +69,9 @@ class Clitter(object):
         self.term = terminal_controller.TerminalController()
         self.verbose = False
         self.command = None
-        self.username = None
-        self.password = None
         self.shelve = ObjectsPersistance(os.path.expanduser("~/.clitter.db"))
         self.settings = {
-            'timeline_date_format': '%Y.%m.%d %H:%M:%S'
+            'twitter.timeline_date_format': '%Y.%m.%d %H:%M:%S'
             }
 
     def print_warning(self, text):
@@ -91,10 +89,25 @@ class Clitter(object):
 
     def process_date(self, date):
         date = self.parse_date(date)
-        return date.strftime(self.settings['timeline_date_format'])
+        return date.strftime(self.settings['twitter.timeline_date_format'])
 
     def parse_date(self, date):
         return datetime.strptime(date, "%a %b %d %H:%M:%S +0000 %Y")
+
+    def fill_in_settings(self, config, section, vital_options=[], strict=True):
+        if config.has_section(section):
+            for option in config.options(section):
+                if option in vital_options:
+                    del vital_options[vital_options.index(option)]
+                self.settings["%s.%s" % (section, option)] = config.get(section, option)
+            if len(vital_options):
+                self.print_error("You must define the following parameters in your configuration file:")
+                self.print_error("\t%s" % ", ".join(map(lambda x: "\"%s\"" % x, vital_options)))
+                sys.exit(1)
+        else:
+            if strict:
+                self.print_error("You must have section \"%s\" in your configuration file." % section)
+                sys.exit(1)
 
     def read_config(self):
         config = RawConfigParser()
@@ -102,12 +115,8 @@ class Clitter(object):
         if not len(config.read([cfg_path])):
             self.print_error("Could not read config from: %s" % cfg_path)
             self.quit(1)
-        username = config.get("auth", "username")
-        password = config.get("auth", "password")
-        for option in config.options("core"):
-            self.settings[option] = config.get("core", option)
-        self.username = username
-        self.password = password
+        self.fill_in_settings(config, "twitter", ["username", "password"], True)
+        self.fill_in_settings(config, "core", strict=False)
 
     def quit(self, status, print_usage=True):
         if print_usage:
@@ -145,7 +154,7 @@ class Clitter(object):
     def command_destroy(self):
         status_id = sys.argv[2]
         self.print_highlight("Deleting status...")
-        api = twitter.APIRequest(self.username, self.password)
+        api = twitter.APIRequest(self.settings['twitter.username'], self.settings['twitter.password'])
         json = api.destroy(status_id)
         if json.has_key("id"):
             self.print_warning("Destroyed status %d" % json["id"])
@@ -157,14 +166,14 @@ class Clitter(object):
         if len(sys.argv) > 2:
             screenname = sys.argv[2]
         else:
-            screenname = self.username
+            screenname = self.settings['twitter.username']
         self.print_highlight("Fetching statuses for id %s" % screenname)
         # pick up last entry
         prev_timeline = self.shelve.get("user_timeline")
         since = None
         if prev_timeline:
             since = prev_timeline[0]['created_at']
-        api = twitter.APIRequest(self.username, self.password)
+        api = twitter.APIRequest(self.settings['twitter.username'], self.settings['twitter.password'])
         json = api.get_user_timeline(screenname, since=since)
         if prev_timeline:
             json = json + prev_timeline
@@ -180,7 +189,7 @@ class Clitter(object):
     def command_add(self):
         status = sys.argv[2]
         self.print_highlight("Updating status ...")
-        api = twitter.APIRequest(self.username, self.password)
+        api = twitter.APIRequest(self.settings['twitter.username'], self.settings['twitter.password'])
         json = api.update(status)
         if json.has_key("id"):
             self.print_warning("Updated your status, id is %d" % json["id"])
