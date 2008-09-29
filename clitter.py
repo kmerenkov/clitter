@@ -40,7 +40,8 @@ usage = \
       a <status>    - update your status
       d <id>        - destroy status by id
       fu [user_id]  - fetch user statuses by user_id
-                      (if user_id is ommiitted, fetch your own statuses)"""
+                      (if user_id is ommiitted, fetch your own statuses)
+      r             - get rate_limit_status information"""
 
 class ObjectsPersistance(object):
     def __init__(self, filename):
@@ -130,7 +131,7 @@ class Clitter(object):
         check_args(2)
         if sys.argv[1] in ["a", "d"]:
             check_args(3)
-        elif sys.argv[1] in ["fu"]:
+        elif sys.argv[1] in ["fu", "r"]:
             pass
         else:
             self.quit(1)
@@ -139,6 +140,7 @@ class Clitter(object):
     def main(self):
         self.parse_args()
         self.read_config()
+        self.api = twitter.APIRequest(self.settings['twitter.username'], self.settings['twitter.password'])
         self.handle_command()
 
     def handle_command(self):
@@ -148,14 +150,20 @@ class Clitter(object):
             self.command_fetch_user_timeline()
         elif self.command == "d":
             self.command_destroy()
+        elif self.command == "r":
+            self.command_rate_limit_status()
         else:
             assert "Unknown command %s" % self.command
+
+    def command_rate_limit_status(self):
+        self.print_highlight("Retrieving rate limit status...")
+        json = self.api.get_rate_limit_status()
+        pprint(json)
 
     def command_destroy(self):
         status_id = sys.argv[2]
         self.print_highlight("Deleting status...")
-        api = twitter.APIRequest(self.settings['twitter.username'], self.settings['twitter.password'])
-        json = api.destroy(status_id)
+        json = self.api.destroy(status_id)
         if json.has_key("id"):
             self.print_warning("Destroyed status %d" % json["id"])
         else:
@@ -173,8 +181,7 @@ class Clitter(object):
         since = None
         if prev_timeline:
             since = prev_timeline[0]['created_at']
-        api = twitter.APIRequest(self.settings['twitter.username'], self.settings['twitter.password'])
-        json = api.get_user_timeline(screenname, since=since)
+        json = self.api.get_user_timeline(screenname, since=since)
         if prev_timeline and len(json):
             if json[0] != prev_timeline[0]:
                 json = json+prev_timeline
@@ -192,8 +199,7 @@ class Clitter(object):
     def command_add(self):
         status = sys.argv[2]
         self.print_highlight("Updating status ...")
-        api = twitter.APIRequest(self.settings['twitter.username'], self.settings['twitter.password'])
-        json = api.update(status)
+        json = self.api.update(status)
         if json.has_key("id"):
             self.print_warning("Updated your status, id is %d" % json["id"])
         else:

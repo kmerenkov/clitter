@@ -31,7 +31,8 @@ import urllib2
 import cjson
 from datetime import datetime
 
-twitter_url_prefix = 'http://twitter.com/statuses/'
+twitter_statuses_prefix = 'http://twitter.com/statuses/'
+twitter_account_prefix = 'http://twitter.com/account/'
 
 
 def request_get(url):
@@ -81,7 +82,7 @@ class APIRequest(object):
         return urllib.quote_plus(http_date)
 
     def get_public_timeline(self):
-        url = "%s%s" % (twitter_url_prefix, "public_timeline.json")
+        url = "%s%s" % (twitter_statuses_prefix, "public_timeline.json")
         got_data = request_get(url)
         json = cjson.decode(got_data)
         return json
@@ -93,7 +94,7 @@ class APIRequest(object):
         """
         if not all([self.username, self.password]):
             raise NotAuthorizedError("Both username and password required")
-        url = "%s%s" % (twitter_url_prefix, "friends_timeline.json")
+        url = "%s%s" % (twitter_statuses_prefix, "friends_timeline.json")
         got_data = request_get(url)
         json = cjson.decode(got_data)
         return json
@@ -105,7 +106,7 @@ class APIRequest(object):
         """
         if not all([self.username, self.password]):
             raise NotAuthorizedError("Both username and password required")
-        url = "%s%s" % (twitter_url_prefix, "update.json")
+        url = "%s%s" % (twitter_statuses_prefix, "update.json")
         status = "status=%s" % urllib.quote(status)
         got_data = request_post(url, self.username, self.password, status)
         json = cjson.decode(got_data)
@@ -118,7 +119,7 @@ class APIRequest(object):
         """
         if not all([self.username, self.password]):
             raise NotAuthorizedError("Both username and password required")
-        url = "%s%s" % (twitter_url_prefix, "destroy/%s.json" % id)
+        url = "%s%s" % (twitter_statuses_prefix, "destroy/%s.json" % id)
         got_data = request_post(url, self.username, self.password, "")
         json = cjson.decode(got_data)
         return json
@@ -132,7 +133,7 @@ class APIRequest(object):
         """
         if not all([self.username, self.password]):
             raise NotAuthorizedError("Both username and password required")
-        url = "%s%s" % (twitter_url_prefix, "user_timeline.json")
+        url = "%s%s" % (twitter_statuses_prefix, "user_timeline.json")
         options = ""
         if user_id is not None:
             user_id = "id=%s" % user_id
@@ -144,3 +145,16 @@ class APIRequest(object):
         got_data = request_get("%s?%s" % (url, options))
         json = cjson.decode(got_data)
         return json
+
+    def get_rate_limit_status(self):
+        """
+        Returns the remaining number of API requests available to the
+        authenticating user before the API limit is reached for the current
+        hour. Calls to rate_limit_status require authentication, but will not
+        count against the rate limit.
+        """
+        url = "%s%s" % (twitter_account_prefix, "rate_limit_status.json")
+        got_data = request_get(url)
+        json = cjson.decode(got_data)
+        return json
+
