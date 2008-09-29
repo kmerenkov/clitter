@@ -72,7 +72,9 @@ class Clitter(object):
         self.command = None
         self.shelve = ObjectsPersistance(os.path.expanduser("~/.clitter.db"))
         self.settings = {
-            'twitter.timeline_date_format': '%Y.%m.%d %H:%M:%S'
+            'twitter.timeline_date_format': '%Y.%m.%d %H:%M:%S',
+            'twitter.username': '',
+            'twitter.password': '',
             }
 
     def print_warning(self, text):
@@ -158,7 +160,11 @@ class Clitter(object):
     def command_rate_limit_status(self):
         self.print_highlight("Retrieving rate limit status...")
         json = self.api.get_rate_limit_status()
-        pprint(json)
+        if json.has_key("hourly_limit"):
+            self.print_warning("Hits: %d/%d" % (json["remaining_hits"], json["hourly_limit"]))
+        else:
+            self.print_error("Failed to retrieve rate limit status, response was:")
+            pprint(json)
 
     def command_destroy(self):
         status_id = sys.argv[2]
