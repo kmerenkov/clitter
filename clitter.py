@@ -194,10 +194,7 @@ class Clitter(object):
         elif options.add_status:
             self.command_add(options.add_status)
         elif options.fetch_user:
-            if args:
-                self.command_fetch_user_timeline(args[0])
-            else:
-                self.command_fetch_user_timeline()
+            self.command_fetch_user_timeline(args[0] if args else None)
         elif options.destroy:
             self.command_destroy(options.destroy)
 
