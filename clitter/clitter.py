@@ -26,107 +26,15 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
 import twitter
-from ConfigParser import RawConfigParser
+
 import os
 from pprint import pprint
 from datetime import datetime
 import terminal_controller
-import shelve
-from getpass import getpass
 from optparse import OptionParser
-
-
-usage = \
-"""Usage:
-      a <status>    - update your status
-      d <id>        - destroy status by id
-      fu [user_id]  - fetch user statuses by user_id
-                      (if user_id is ommiitted, fetch your own statuses)
-      r             - get rate_limit_status information
-      --nocached    - don't print cached data
-      -q --quiet    - print results only"""
-
-
-class ObjectsPersistance(object):
-    def __init__(self, filename):
-        self.filename = filename
-        self.shelve = None
-
-    def open(self):
-        self.shelve = shelve.open(self.filename)
-
-    def get(self, name):
-        self.open()
-        if self.shelve.has_key(name):
-            retval = self.shelve[name]
-        else:
-            retval = ''
-        self.shelve.close()
-        return retval
-
-    def set(self, name, data):
-        self.open()
-        self.shelve[name] = data
-        self.shelve.close()
-
-
-class Config(object):
-    def __init__(self, filename='~/.clitter'):
-        self.filename = os.path.expanduser(filename)
-        self.config = None
-        self.params_ask = ['twitter.username', 'twitter.password']
-        self.defaults = {
-            'twitter.timeline_date_format': '%Y.%m.%d %H:%M:%S',
-            'twitter.username': '',
-            'twitter.password': '',
-            }
-
-    def __open_config(self):
-        f = open(self.filename, 'w+')
-        return f
-
-    def read(self):
-        self.config = RawConfigParser()
-        if not self.config.read([self.filename]):
-            f = self.__open_config()
-            f.write('')
-            f.close()
-            self.read()
-
-    def sync(self):
-        f = self.__open_config()
-        self.config.write(f)
-        f.close()
-
-    def __getitem__(self, item):
-        section, name = item.split(".")
-        if not all([section, name]):
-            return None
-        if self.config.has_section(section) and self.config.has_option(section, name):
-            return self.config.get(section, name)
-        else:
-            if item in self.params_ask:
-                if "password" in item:
-                    val = getpass("Please enter %s: " % name)
-                else:
-                    val = raw_input("Please enter %s: " % name)
-                if val:
-                    self[item] = val
-                    self.sync()
-                    return val
-            if item in self.defaults:
-                return self.defaults[item]
-            return None
-
-    def __setitem__(self, item, value):
-        section, name = item.split(".")
-        if not all([section, name]):
-            return None
-        if not self.config.has_section(section):
-            self.config.add_section(section)
-        self.config.set(section, name, value)
+from config import Config
+from cache import ObjectsPersistance
 
 
 class Clitter(object):
@@ -137,11 +45,11 @@ class Clitter(object):
         self.quiet = False
         self.command = None
         self.shelve = ObjectsPersistance(os.path.expanduser("~/.clitter.db"))
-        self.config = Config()
+        self.config = Config(os.path.expanduser("~/.clitter"))
 
     def _print(self, text):
         if not self.quiet:
-            print text
+            print text.encode('utf-8')
 
     def print_data(self, text):
         self._print(self.term.render(u"${YELLOW}%s${NORMAL}" % text))
@@ -154,7 +62,7 @@ class Clitter(object):
 
     def print_timeline(self, date, text):
         date = self.process_date(date)
-        print self.term.render(u"${YELLOW}%s${NORMAL}: %s" % (date, text))
+        print self.term.render(u"${YELLOW}%s${NORMAL}: %s" % (date, text)).encode('utf-8')
 
     def process_date(self, date):
         date = self.parse_date(date)
@@ -163,7 +71,7 @@ class Clitter(object):
     def parse_date(self, date):
         return datetime.strptime(date, "%a %b %d %H:%M:%S +0000 %Y")
 
-    def parse_args(self):
+    def handle_args(self):
         parser = OptionParser(usage="%progname -r|-a|-f", version="0.1")
         parser.add_option('-r', '--rate-time-limit',
                           action='store_true',
@@ -200,7 +108,7 @@ class Clitter(object):
 
     def main(self):
         self.config.read()
-        self.parse_args()
+        self.handle_args()
 
     def command_rate_limit_status(self):
         api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])

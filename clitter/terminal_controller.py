@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # This code is
 #  - taken from http://code.activestate.com/recipes/475116/
 #  - written by Edward Loper Sat 11 Mar 2006

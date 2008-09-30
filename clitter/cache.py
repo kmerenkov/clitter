@@ -26,12 +26,27 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from distutils.core import setup
-setup(name='clitter',
-      version='0.1',
-      description='Command line twitter client',
-      author='Konstantin Merenkov',
-      author_email='kmerenkov@gmail.com',
-      url='http://github.com/kmerenkov/clitter/',
-      packages=['twitter', 'clitter'],
-      scripts=['clitter'])
+import shelve
+
+
+class ObjectsPersistance(object):
+    def __init__(self, filename):
+        self.filename = filename
+        self.shelve = None
+
+    def open(self):
+        self.shelve = shelve.open(self.filename)
+
+    def get(self, name):
+        self.open()
+        if self.shelve.has_key(name):
+            retval = self.shelve[name]
+        else:
+            retval = ''
+        self.shelve.close()
+        return retval
+
+    def set(self, name, data):
+        self.open()
+        self.shelve[name] = data
+        self.shelve.close()
