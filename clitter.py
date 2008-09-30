@@ -204,18 +204,6 @@ class Clitter(object):
         self.config.read()
         self.parse_args()
 
-    def handle_command2(self):
-        if self.command == "add_status":
-            self.command_add()
-        elif self.command == "fetch_user_timeline":
-            self.command_fetch_user_timeline()
-        elif self.command == "destroy":
-            self.command_destroy()
-        elif self.command == "rate_time_limit":
-            self.command_rate_limit_status()
-        else:
-            assert "Unknown command %s" % self.command
-
     def command_rate_limit_status(self):
         api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
         self.print_progress("Retrieving rate limit status...")
