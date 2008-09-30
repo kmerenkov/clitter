@@ -133,21 +133,24 @@ class Clitter(object):
     def __init__(self):
         self.term = terminal_controller.TerminalController()
         self.verbose = False
-        self.ommit_storage = False
+        self.no_cache = False
         self.quiet = False
         self.command = None
         self.shelve = ObjectsPersistance(os.path.expanduser("~/.clitter.db"))
         self.config = Config()
 
+    def _print(self, text):
+        if not self.quiet:
+            print text
+
     def print_data(self, text):
-        print self.term.render(u"${YELLOW}%s${NORMAL}" % text)
+        self._print(self.term.render(u"${YELLOW}%s${NORMAL}" % text))
 
     def print_error(self, text):
-        print self.term.render(u"${RED}%s${NORMAL}" % text)
+        self._print(self.term.render(u"${RED}%s${NORMAL}" % text))
 
     def print_progress(self, text):
-        if not self.quiet:
-            print self.term.render(u"${GREEN}%s${NORMAL}" % text)
+        self._print(self.term.render(u"${GREEN}%s${NORMAL}" % text))
 
     def print_timeline(self, date, text):
         date = self.process_date(date)
@@ -160,11 +163,6 @@ class Clitter(object):
     def parse_date(self, date):
         return datetime.strptime(date, "%a %b %d %H:%M:%S +0000 %Y")
 
-    def quit(self, status, print_usage=True):
-        if print_usage:
-            print usage
-        sys.exit(status)
-
     def parse_args(self):
         parser = OptionParser(usage="%progname -r|-a|-f", version="0.1")
         parser.add_option('-r', '--rate-time-limit',
@@ -174,7 +172,7 @@ class Clitter(object):
                           default="",
                           help="Update your status")
         parser.add_option('-f', '--fetch-user',
-                          default=None,
+                          action='store_true', # dirty workaround?
                           help="Fetch user timeline")
         parser.add_option('-d', '--destroy',
                           default=0,
@@ -196,7 +194,10 @@ class Clitter(object):
         elif options.add_status:
             self.command_add(options.add_status)
         elif options.fetch_user:
-            self.command_fetch_user_timeline(options.fetch_user)
+            if args:
+                self.command_fetch_user_timeline(args[0])
+            else:
+                self.command_fetch_user_timeline()
         elif options.destroy:
             self.command_destroy(options.destroy)
 
@@ -208,7 +209,7 @@ class Clitter(object):
         api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
         self.print_progress("Retrieving rate limit status...")
         json = api.get_rate_limit_status()
-        if json.has_key("hourly_limit"):
+        if "hourly_limit" in json and "remaining_hits" in json:
             self.print_data("Hits: %d/%d" % (json["remaining_hits"], json["hourly_limit"]))
         else:
             self.print_error("Failed to retrieve rate limit status, response was:")
@@ -218,7 +219,7 @@ class Clitter(object):
         api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
         self.print_progress("Deleting status...")
         json = api.destroy(status_id)
-        if json.has_key("id"):
+        if "id" in json:
             self.print_data("Destroyed status %d" % json["id"])
         else:
             self.print_error("Failed to destroy status %d, response was:" % int(status_id))
@@ -226,7 +227,7 @@ class Clitter(object):
 
     def command_fetch_user_timeline(self, screenname=''):
         if not screenname:
-            screenname = self.config['twitter.screennamename']
+            screenname = self.config['twitter.username']
         api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
         self.print_progress("Fetching statuses for id %s" % screenname)
         # pick up last entry
@@ -236,7 +237,7 @@ class Clitter(object):
         if prev_timeline:
             since_id = prev_timeline[0]['id']
         json = api.get_user_timeline(screenname, since_id=since_id)
-        if not self.ommit_storage:
+        if not self.no_cache:
             if prev_timeline and len(json):
                 if json[0] != prev_timeline[0]:
                     json = json + prev_timeline
