@@ -35,6 +35,7 @@ from datetime import datetime
 import terminal_controller
 import shelve
 from getpass import getpass
+from optparse import OptionParser
 
 
 usage = \
@@ -165,23 +166,29 @@ class Clitter(object):
         sys.exit(status)
 
     def parse_args(self):
-        # NOTE optparse is on its way!
-        def check_args(required):
-            if len(sys.argv) < required:
-                self.quit(1)
-        check_args(2)
-        if sys.argv[1] in ["a", "d"]:
-            check_args(3)
-        elif sys.argv[1] in ["fu", "r"]:
-            pass
+        parser = OptionParser(usage="%s -r|-a|-f ..." % sys.argv[0])
+        parser.add_option('-r', '--rate_time_limit',
+                          dest='command',
+                          const='rate_time_limit',
+                          action='store_const',
+                          help="Retrieve rate_time_limit.")
+        parser.add_option('-a', '--add_status',
+                          dest='command',
+                          const='add_status',
+                          action='store_const',
+                          help="Update your status")
+        parser.add_option('-f', '--fetchuser',
+                          dest='command',
+                          const='fetch_user_timeline',
+                          action='store_const',
+                          help="Fetch user timeline")
+        options, args = parser.parse_args(sys.argv[1:])
+        if options.command in ['rate_time_limit',
+                               'add_status',
+                               'fetch_user_timeline']:
+            self.command = options.command
         else:
-            self.quit(1)
-        args = sys.argv[1:]
-        if "--nocache" in args:
-            self.ommit_storage = True
-        if "--quiet" in args or "-q" in args:
-            self.quiet = True
-        self.command = sys.argv[1]
+            parser.error("Must supply at least one action")
 
     def main(self):
         self.parse_args()
@@ -189,13 +196,13 @@ class Clitter(object):
         self.handle_command()
 
     def handle_command(self):
-        if self.command == "a":
+        if self.command == "add_status":
             self.command_add()
-        elif self.command == "fu":
+        elif self.command == "fetch_user_timeline":
             self.command_fetch_user_timeline()
-        elif self.command == "d":
+        elif self.command == "destroy":
             self.command_destroy()
-        elif self.command == "r":
+        elif self.command == "rate_time_limit":
             self.command_rate_limit_status()
         else:
             assert "Unknown command %s" % self.command
