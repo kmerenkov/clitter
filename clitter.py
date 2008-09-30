@@ -166,36 +166,45 @@ class Clitter(object):
         sys.exit(status)
 
     def parse_args(self):
-        parser = OptionParser(usage="%s -r|-a|-f ..." % sys.argv[0])
-        parser.add_option('-r', '--rate_time_limit',
-                          dest='command',
-                          const='rate_time_limit',
-                          action='store_const',
-                          help="Retrieve rate_time_limit.")
-        parser.add_option('-a', '--add_status',
-                          dest='command',
-                          const='add_status',
-                          action='store_const',
+        parser = OptionParser(usage="%progname -r|-a|-f", version="0.1")
+        parser.add_option('-r', '--rate-time-limit',
+                          action='store_true',
+                          help="Retrieve rate time limit.")
+        parser.add_option('-a', '--add-status',
+                          default="",
                           help="Update your status")
-        parser.add_option('-f', '--fetchuser',
-                          dest='command',
-                          const='fetch_user_timeline',
-                          action='store_const',
+        parser.add_option('-f', '--fetch-user',
+                          default=None,
                           help="Fetch user timeline")
-        options, args = parser.parse_args(sys.argv[1:])
-        if options.command in ['rate_time_limit',
-                               'add_status',
-                               'fetch_user_timeline']:
-            self.command = options.command
-        else:
-            parser.error("Must supply at least one action")
+        parser.add_option('-d', '--destroy',
+                          default=0,
+                          type="int",
+                          help="Destroy status specified by id")
+        parser.add_option('-v', '--verbose',
+                          action='store_true',
+                          help="Be verbose")
+        parser.add_option('-n', '--no-cache',
+                          action='store_true',
+                          help="Don't print cached statuses")
+        options, args = parser.parse_args()
+
+        self.verbose = bool(options.verbose)
+        self.no_cache = bool(options.no_cache)
+
+        if options.rate_time_limit:
+            self.command_rate_limit_status()
+        elif options.add_status:
+            self.command_add(options.add_status)
+        elif options.fetch_user:
+            self.command_fetch_user_timeline(options.fetch_user)
+        elif options.destroy:
+            self.command_destroy(options.destroy)
 
     def main(self):
-        self.parse_args()
         self.config.read()
-        self.handle_command()
+        self.parse_args()
 
-    def handle_command(self):
+    def handle_command2(self):
         if self.command == "add_status":
             self.command_add()
         elif self.command == "fetch_user_timeline":
@@ -217,9 +226,8 @@ class Clitter(object):
             self.print_error("Failed to retrieve rate limit status, response was:")
             pprint(json)
 
-    def command_destroy(self):
+    def command_destroy(self, status_id):
         api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
-        status_id = sys.argv[2]
         self.print_progress("Deleting status...")
         json = api.destroy(status_id)
         if json.has_key("id"):
@@ -228,11 +236,9 @@ class Clitter(object):
             self.print_error("Failed to destroy status %d, response was:" % int(status_id))
             pprint(json)
 
-    def command_fetch_user_timeline(self):
-        if len(sys.argv) > 2:
-            screenname = sys.argv[2]
-        else:
-            screenname = self.config['twitter.username']
+    def command_fetch_user_timeline(self, screenname=''):
+        if not screenname:
+            screenname = self.config['twitter.screennamename']
         api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
         self.print_progress("Fetching statuses for id %s" % screenname)
         # pick up last entry
@@ -260,9 +266,8 @@ class Clitter(object):
             self.print_error("Failed to fetch statuses, response was:")
             pprint(json)
 
-    def command_add(self):
+    def command_add(self, status):
         api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
-        status = sys.argv[2]
         self.print_progress("Updating status ...")
         json = api.update(status)
         if json.has_key("id"):
