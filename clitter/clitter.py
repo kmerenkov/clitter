@@ -47,9 +47,15 @@ class Clitter(object):
         self.shelve = ObjectsPersistance(os.path.expanduser("~/.clitter.db"))
         self.config = Config(os.path.expanduser("~/.clitter"))
 
+    def __print(self, text):
+        try:
+            print text.encode('utf-8')
+        except IOError:
+            return
+
     def _print(self, text):
         if not self.quiet:
-            print text.encode('utf-8')
+            self.__print(text)
 
     def print_data(self, text):
         self._print(self.term.render(u"${YELLOW}%s${NORMAL}" % text))
@@ -62,7 +68,7 @@ class Clitter(object):
 
     def print_timeline(self, date, text):
         date = self.process_date(date)
-        print self.term.render(u"${YELLOW}%s${NORMAL}: %s" % (date, text)).encode('utf-8')
+        self.__print(self.term.render(u"${YELLOW}%s${NORMAL}: %s" % (date, text)))
 
     def process_date(self, date):
         date = self.parse_date(date)
@@ -142,17 +148,19 @@ class Clitter(object):
         if prev_timeline:
             since_id = prev_timeline[0]['id']
         json = api.get_user_timeline(screenname, since_id=since_id)
-        if not self.no_cache:
-            if prev_timeline and len(json):
-                if json[0] != prev_timeline[0]:
-                    json = json + prev_timeline
-            if prev_timeline and not len(json):
-                json = prev_timeline
+        # if not self.no_cache:
+        #     if prev_timeline and len(json):
+        #         if json[0] != prev_timeline[0]:
+        #             json = json + prev_timeline
+        #     if prev_timeline and not len(json):
+        #         json = prev_timeline
         if isinstance(json, list):
             if prev_timeline:
                 self.shelve.set("user_timeline/%s" % screenname, prev_timeline + json)
             else:
                 self.shelve.set("user_timeline/%s" % screenname, json)
+            if not self.no_cache:
+                json = json + prev_timeline
             # it is a list of dictionaries
             for status in json:
                 self.print_timeline(status['created_at'], status['text'])
