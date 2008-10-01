@@ -35,7 +35,7 @@ class ObjectsPersistance(object):
         self.shelve = None
 
     def open(self):
-        self.shelve = shelve.open(self.filename)
+        self.shelve = shelve.open(self.filename, writeback=True)
 
     def get(self, name):
         self.open()

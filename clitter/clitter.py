@@ -43,6 +43,7 @@ class Clitter(object):
         self.verbose = False
         self.no_cache = False
         self.quiet = False
+        self.show_ids = False
         self.command = None
         self.shelve = ObjectsPersistance(os.path.expanduser("~/.clitter.db"))
         self.config = Config(os.path.expanduser("~/.clitter"))
@@ -66,9 +67,16 @@ class Clitter(object):
     def print_progress(self, text):
         self._print(self.term.render(u"${GREEN}%s${NORMAL}" % text))
 
-    def print_timeline(self, date, text):
+    def print_timeline(self, date, text, prefix=''):
         date = self.process_date(date)
-        self.__print(self.term.render(u"${YELLOW}%s${NORMAL}: %s" % (date, text)))
+        left = date
+        if prefix:
+            left = "%s %s" % (prefix, date)
+        self.__print(self.term.render(u"${YELLOW}%s${NORMAL}: %s" % (left, text)))
+
+    def print_unexpected_json(self, data):
+        self.__print("${RED}%s:${NORMAL}$" % "Unexpected json reply")
+        pprint(data)
 
     def process_date(self, date):
         date = self.parse_date(date)
@@ -84,6 +92,7 @@ class Clitter(object):
                           help="Retrieve rate time limit.")
         parser.add_option('-a', '--add-status',
                           default="",
+                          metavar="STATUS",
                           help="Update your status")
         parser.add_option('-f', '--fetch-user',
                           action='store_true', # dirty workaround?
@@ -98,10 +107,19 @@ class Clitter(object):
         parser.add_option('-n', '--no-cache',
                           action='store_true',
                           help="Don't print cached statuses")
+        parser.add_option('-q', '--quiet',
+                          action='store_true',
+                          help="Be quiet about progress")
+        parser.add_option('--id',
+                           action='store_true',
+                           dest="show_ids",
+                           help="Print ids in timeline")
         options, args = parser.parse_args()
 
+        self.quiet = bool(options.quiet)
         self.verbose = bool(options.verbose)
         self.no_cache = bool(options.no_cache)
+        self.show_ids = bool(options.show_ids)
 
         if options.rate_time_limit:
             self.command_rate_limit_status()
@@ -116,25 +134,34 @@ class Clitter(object):
         self.config.read()
         self.handle_args()
 
+    def handle_api_response(self, api_callable, *args, **kwargs):
+        try:
+            retval = api_callable(*args, **kwargs)
+        except twitter.TwitterTransportError, e:
+            self.print_error(e)
+            return None
+        else:
+            return retval
+
     def command_rate_limit_status(self):
         api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
         self.print_progress("Retrieving rate limit status...")
-        json = api.get_rate_limit_status()
-        if "hourly_limit" in json and "remaining_hits" in json:
-            self.print_data("Hits: %d/%d" % (json["remaining_hits"], json["hourly_limit"]))
-        else:
-            self.print_error("Failed to retrieve rate limit status, response was:")
-            pprint(json)
+        data = self.handle_api_response(api.get_rate_limit_status)
+        if data:
+            if "hourly_limit" in data and "remaining_hits" in data:
+                self.print_data("Hits: %d/%d" % (data["remaining_hits"], data["hourly_limit"]))
+            else:
+                self.print_unexpected_json(data)
 
     def command_destroy(self, status_id):
         api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
         self.print_progress("Deleting status...")
-        json = api.destroy(status_id)
-        if "id" in json:
-            self.print_data("Destroyed status %d" % json["id"])
-        else:
-            self.print_error("Failed to destroy status %d, response was:" % int(status_id))
-            pprint(json)
+        data = self.handle_api_response(api.destroy, status_id)
+        if data:
+            if "id" in data:
+                self.print_data("Destroyed status %d" % data["id"])
+            else:
+                self.print_unexpected_json(data)
 
     def command_fetch_user_timeline(self, screenname=''):
         if not screenname:
@@ -143,34 +170,37 @@ class Clitter(object):
         self.print_progress("Fetching statuses for id %s" % screenname)
         # pick up last entry
         json = []
+        shelve_key = "user_timeline/%s" % screenname
         since_id = None
-        prev_timeline = self.shelve.get("user_timeline/%s" % screenname)
+        prev_timeline = self.shelve.get(shelve_key)
         if prev_timeline:
             since_id = prev_timeline[0]['id']
-        json = api.get_user_timeline(screenname, since_id=since_id)
-        if isinstance(json, list):
+        json = self.handle_api_response(api.get_user_timeline, screenname, since_id=since_id)
+        if json or prev_timeline:
+            json = json or []
+            prev_timeline = prev_timeline or []
             if prev_timeline:
-                self.shelve.set("user_timeline/%s" % screenname, prev_timeline + json)
+                self.shelve.set(shelve_key, json + prev_timeline)
             else:
-                self.shelve.set("user_timeline/%s" % screenname, json)
+                self.shelve.set(shelve_key, json)
             if not self.no_cache:
                 json = json + prev_timeline
             # it is a list of dictionaries
             for status in json:
-                self.print_timeline(status['created_at'], status['text'])
-        else:
-            self.print_error("Failed to fetch statuses, response was:")
-            pprint(json)
+                timeline_prefix = ''
+                if self.show_ids:
+                    timeline_prefix = status['id']
+                self.print_timeline(status['created_at'], status['text'], prefix=timeline_prefix)
 
     def command_add(self, status):
         api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
         self.print_progress("Updating status ...")
-        json = api.update(status)
-        if json.has_key("id"):
-            self.print_data("Updated your status, id is %d" % json["id"])
-        else:
-            self.print_error("Failed to update your status, response was:")
-            pprint(json)
+        json = self.handle_api_response(api.update, status)
+        if json:
+            if json.has_key("id"):
+                self.print_data("Updated your status, id is %d" % json["id"])
+            else:
+                self.print_unexpected_json(json)
 
 
 if __name__ == '__main__':

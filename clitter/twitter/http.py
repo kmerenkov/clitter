@@ -62,8 +62,7 @@ def make_request(url, username='', password='', data={}, method='GET'):
         f.close()
         return retdata
     except urllib2.HTTPError, e:
-        print e
-        retval = '{}'
+        return (e.code, e.msg)
     return retval
 
 def GET(url, username='', password='', data={}):

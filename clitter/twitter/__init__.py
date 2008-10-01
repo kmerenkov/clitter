@@ -33,16 +33,25 @@ twitter_statuses_prefix = 'http://twitter.com/statuses/'
 twitter_account_prefix = 'http://twitter.com/account/'
 
 
+class TwitterTransportError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+
 class APIRequest(object):
     def __init__(self, username='', password=''):
         self.username = username
         self.password = password
 
+    def __get_json_or_error(self, data):
+        if isinstance(data, tuple):
+            raise TwitterTransportError("%s: %s" % (data[0], data[1]))
+        return json.decode(data)
+
     def get_public_timeline(self):
         url = "%s%s" % (twitter_statuses_prefix, "public_timeline.json")
         got_data = http.GET(url, self.username, self.password)
-        parsed_json = json.decode(got_data)
-        return parsed_json
+        return self.__get_json_or_error(got_data)
 
     @login_requied
     def get_friends_timeline(self, since=None, since_id=None, count=None, page=None):
@@ -52,8 +61,7 @@ class APIRequest(object):
         """
         url = "%s%s" % (twitter_statuses_prefix, "friends_timeline.json")
         got_data = http.GET(url, self.username, self.password)
-        parsed_json = json.decode(got_data)
-        return parsed_json
+        return self.__get_json_or_error(got_data)
 
     @login_requied
     def update(self, status, in_reply_to_status_id=None):
@@ -63,8 +71,7 @@ class APIRequest(object):
         """
         url = "%s%s" % (twitter_statuses_prefix, "update.json")
         got_data = http.POST(url, self.username, self.password, {'status': status})
-        parsed_json = json.decode(got_data)
-        return parsed_json
+        return self.__get_json_or_error(got_data)
 
     @login_requied
     def destroy(self, id):
@@ -74,8 +81,7 @@ class APIRequest(object):
         """
         url = "%s%s" % (twitter_statuses_prefix, "destroy/%s.json" % id)
         got_data = http.POST(url, self.username, self.password)
-        parsed_json = json.decode(got_data)
-        return parsed_json
+        return self.__get_json_or_error(got_data)
 
     @login_requied
     def get_user_timeline(self, user_id=None, count=None, since=None, since_id=None, page=None):
@@ -96,8 +102,7 @@ class APIRequest(object):
         if since_id is not None:
             data['since_id'] = since_id
         got_data = http.GET(url, self.username, self.password, data)
-        parsed_json = json.decode(got_data)
-        return parsed_json
+        return self.__get_json_or_error(got_data)
 
     @login_requied
     def get_rate_limit_status(self):
@@ -109,6 +114,5 @@ class APIRequest(object):
         """
         url = "%s%s" % (twitter_account_prefix, "rate_limit_status.json")
         got_data = http.GET(url, self.username, self.password)
-        parsed_json = json.decode(got_data)
-        return parsed_json
+        return self.__get_json_or_error(got_data)
 
