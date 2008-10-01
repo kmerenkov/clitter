@@ -148,12 +148,6 @@ class Clitter(object):
         if prev_timeline:
             since_id = prev_timeline[0]['id']
         json = api.get_user_timeline(screenname, since_id=since_id)
-        # if not self.no_cache:
-        #     if prev_timeline and len(json):
-        #         if json[0] != prev_timeline[0]:
-        #             json = json + prev_timeline
-        #     if prev_timeline and not len(json):
-        #         json = prev_timeline
         if isinstance(json, list):
             if prev_timeline:
                 self.shelve.set("user_timeline/%s" % screenname, prev_timeline + json)
