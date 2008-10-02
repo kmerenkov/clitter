@@ -28,7 +28,12 @@
 import urllib
 import urllib2
 from datetime import datetime
+import logging
 
+logger = logging.getLogger('twitter.http')
+
+def debug(text):
+    logger.debug(text)
 
 def http_data(data):
     processed_data = {}
@@ -43,7 +48,7 @@ def make_request(url, username='', password='', data={}, method='GET'):
     if method == "GET":
         if str_data:
             url = "%s?%s" % (url, str_data)
-    # print "%s %s" % (method, url)
+    debug("%s %s" % (method, url))
     if username and password:
         http_handler = urllib2.HTTPBasicAuthHandler()
         http_handler.add_password(realm='Twitter API',

@@ -26,15 +26,18 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import twitter
-
 import os
 from pprint import pprint
 from datetime import datetime
-import terminal_controller
+import logging
 from optparse import OptionParser
+
+import twitter
 from config import Config
 from cache import ObjectsPersistance
+import terminal_controller
+
+logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
 
 
 class Clitter(object):
@@ -42,9 +45,9 @@ class Clitter(object):
         self.term = terminal_controller.TerminalController()
         self.verbose = False
         self.no_cache = False
+        self.dump_http = False
         self.quiet = False
         self.show_ids = False
-        self.command = None
         self.shelve = ObjectsPersistance(os.path.expanduser("~/.clitter.db"))
         self.config = Config(os.path.expanduser("~/.clitter"))
 
@@ -114,12 +117,19 @@ class Clitter(object):
                            action='store_true',
                            dest="show_ids",
                            help="Print ids in timeline")
+        parser.add_option('--dump-http',
+                          action='store_true',
+                          help="Print debug HTTP requests and responses")
         options, args = parser.parse_args()
 
         self.quiet = bool(options.quiet)
         self.verbose = bool(options.verbose)
         self.no_cache = bool(options.no_cache)
         self.show_ids = bool(options.show_ids)
+        self.dump_http = bool(options.dump_http)
+
+        http_logger = logging.getLogger('twitter.http')
+        http_logger.setLevel(10 if self.dump_http else 0)
 
         if options.rate_time_limit:
             self.command_rate_limit_status()
