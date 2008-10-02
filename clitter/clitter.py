@@ -70,16 +70,20 @@ class Clitter(object):
     def print_progress(self, text):
         self._print(self.term.render(u"${GREEN}%s${NORMAL}" % text))
 
-    def print_timeline(self, date, text, prefix=''):
-        date = self.process_date(date)
-        left = date
-        if prefix:
-            left = "%s %s" % (prefix, date)
-        self.__print(self.term.render(u"${YELLOW}%s${NORMAL}: %s" % (left, text)))
+    def print_timeline(self, timeline):
+        for status in timeline:
+            date = self.process_date(status['created_at'])
+            left = date
+            if self.show_ids:
+                left = "%s %s" % (status['id'], date)
+            self.__print(self.term.render(u"${YELLOW}%s${NORMAL}: %s" % (left, status['text'])))
 
     def print_unexpected_json(self, data):
         self.__print("${RED}%s:${NORMAL}$" % "Unexpected json reply")
         pprint(data)
+
+    def print_separator(self, caption):
+        self._print(self.term.render("${YELLOW}====${NORMAL}%s${YELLOW}====${NORMAL}" % caption))
 
     def process_date(self, date):
         date = self.parse_date(date)
@@ -193,14 +197,17 @@ class Clitter(object):
                 self.shelve.set(shelve_key, json + prev_timeline)
             else:
                 self.shelve.set(shelve_key, json)
+
+            if self.config['ui.separate_cached_entries']:
+                self.print_separator("new entries")
+            if json:
+                self.print_timeline(json)
+            else:
+                self.print_error("No updates")
             if not self.no_cache:
-                json = json + prev_timeline
-            # it is a list of dictionaries
-            for status in json:
-                timeline_prefix = ''
-                if self.show_ids:
-                    timeline_prefix = status['id']
-                self.print_timeline(status['created_at'], status['text'], prefix=timeline_prefix)
+                if self.config['ui.separate_cached_entries']:
+                    self.print_separator("cached entries")
+                self.print_timeline(prev_timeline)
 
     def command_add(self, status):
         api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])

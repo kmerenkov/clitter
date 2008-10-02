@@ -39,6 +39,7 @@ class Config(object):
             'twitter.timeline_date_format': '%Y.%m.%d %H:%M:%S',
             'twitter.username': '',
             'twitter.password': '',
+            'ui.separate_cached_entries': True
             }
 
     def __open_config(self):
