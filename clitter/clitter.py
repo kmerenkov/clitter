@@ -70,13 +70,20 @@ class Clitter(object):
     def print_progress(self, text):
         self._print(self.term.render(u"${GREEN}%s${NORMAL}" % text))
 
-    def print_timeline(self, timeline):
+    def print_timeline(self, timeline, print_names=False):
+        # uglinessssss
         for status in timeline:
             date = self.process_date(status['created_at'])
             left = date
             if self.show_ids:
                 left = "%s %s" % (status['id'], date)
-            self.__print(self.term.render(u"${YELLOW}%s${NORMAL}: %s" % (left, status['text'])))
+            left = self.term.render(u"${YELLOW}%s${NORMAL}: " % left)
+
+            if print_names:
+                right = self.term.render("${CYAN}%s:${NORMAL} %s" % (status['user']['name'], status['text']))
+            else:
+                right = self.term.render(status['text'])
+            self.__print("%s%s" % (left, right))
 
     def print_unexpected_json(self, data):
         self.__print("${RED}%s:${NORMAL}$" % "Unexpected json reply")
@@ -101,9 +108,12 @@ class Clitter(object):
                           default="",
                           metavar="STATUS",
                           help="Update your status")
-        parser.add_option('-f', '--fetch-user',
+        parser.add_option('-u', '--fetch-user',
                           action='store_true', # dirty workaround?
                           help="Fetch user timeline")
+        parser.add_option('-f', '--fetch-friends',
+                          action='store_true', # dirty workaround?
+                          help="Fetch friends timeline")
         parser.add_option('-d', '--destroy',
                           default=0,
                           type="int",
@@ -141,6 +151,8 @@ class Clitter(object):
             self.command_add(options.add_status)
         elif options.fetch_user:
             self.command_fetch_user_timeline(args[0] if args else None)
+        elif options.fetch_friends:
+            self.command_fetch_friends_timeline()
         elif options.destroy:
             self.command_destroy(options.destroy)
 
@@ -176,6 +188,36 @@ class Clitter(object):
                 self.print_data("Destroyed status %d" % data["id"])
             else:
                 self.print_unexpected_json(data)
+
+    def command_fetch_friends_timeline(self):
+        api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
+        self.print_progress("Fetching friends timeline")
+        # pick up last entry
+        json = []
+        shelve_key = "friends_timeline"
+        since_id = None
+        prev_timeline = self.shelve.get(shelve_key)
+        if prev_timeline:
+            since_id = prev_timeline[0]['id']
+        json = self.handle_api_response(api.get_friends_timeline, since_id=since_id)
+        if json or prev_timeline:
+            json = json or []
+            prev_timeline = prev_timeline or []
+            if prev_timeline:
+                self.shelve.set(shelve_key, json + prev_timeline)
+            else:
+                self.shelve.set(shelve_key, json)
+
+            if self.config['ui.separate_cached_entries']:
+                self.print_separator("new entries")
+            if json:
+                self.print_timeline(json)
+            else:
+                self.print_error("No updates")
+            if not self.no_cache:
+                if self.config['ui.separate_cached_entries']:
+                    self.print_separator("cached entries")
+                self.print_timeline(prev_timeline, print_names=True)
 
     def command_fetch_user_timeline(self, screenname=''):
         if not screenname:

@@ -60,7 +60,12 @@ class APIRequest(object):
         and that user's friends. This is the equivalent of /home on the Web.
         """
         url = "%s%s" % (twitter_statuses_prefix, "friends_timeline.json")
-        got_data = http.GET(url, self.username, self.password)
+        data = {}
+        if since is not None:
+            data['since'] = http.http_date(since)
+        if since_id is not None:
+            data['since_id'] = since_id
+        got_data = http.GET(url, self.username, self.password, data)
         return self.__get_json_or_error(got_data)
 
     @login_requied
