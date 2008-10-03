@@ -127,7 +127,7 @@ class Clitter(object):
         parser.add_option('-q', '--quiet',
                           action='store_true',
                           help="Be quiet about progress")
-        parser.add_option('--id',
+        parser.add_option('--show-ids',
                            action='store_true',
                            dest="show_ids",
                            help="Print ids in timeline")
