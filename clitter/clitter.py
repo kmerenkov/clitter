@@ -155,6 +155,8 @@ class Clitter(object):
             self.command_fetch_friends_timeline()
         elif options.destroy:
             self.command_destroy(options.destroy)
+        else:
+            parser.print_help()
 
     def main(self):
         self.config.read()
