@@ -211,7 +211,7 @@ class Clitter(object):
             if self.config['ui.separate_cached_entries']:
                 self.print_separator("new entries")
             if json:
-                self.print_timeline(json)
+                self.print_timeline(json, print_names=True)
             else:
                 self.print_error("No updates")
             if not self.no_cache:
