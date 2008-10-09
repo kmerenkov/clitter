@@ -40,7 +40,7 @@ def http_data(data):
     for k,v in data.iteritems():
         if v is not None:
             processed_data[k] = str(v)
-    str_data = "&".join(["%s=%s" % (k,urllib.quote_plus(v)) for k,v in processed_data.iteritems()])
+    str_data = urllib.urlencode(processed_data)
     return str_data
 
 def make_request(url, username='', password='', data={}, method='GET'):
@@ -63,12 +63,11 @@ def make_request(url, username='', password='', data={}, method='GET'):
             f = opener.open(url)
         else:
             f = opener.open(url, str_data)
-        retdata  = f.read()
+        retdata = f.read()
         f.close()
         return retdata
     except urllib2.HTTPError, e:
         return (e.code, e.msg)
-    return retval
 
 def GET(url, username='', password='', data={}):
     return make_request(url, username, password, data, 'GET')
