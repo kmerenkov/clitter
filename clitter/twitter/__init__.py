@@ -25,7 +25,17 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import cjson as json
+try:
+    import json
+except ImportError:
+    try:
+        import cjson as json
+    except ImportError:
+        try:
+            import simplejson as json
+        except ImportError:
+            print "Failed to find any of supported json libraries. Tried: json, cjson, simplejson."
+            exit(1)
 import http
 from decorators import login_requied
 
@@ -46,7 +56,10 @@ class APIRequest(object):
     def __get_json_or_error(self, data):
         if isinstance(data, tuple):
             raise TwitterTransportError("%s: %s" % (data[0], data[1]))
-        return json.decode(data)
+        if "loads" in dir(json): # for simplejson
+            return json.loads(data)
+        else:
+            return json.decode(data)
 
     def get_public_timeline(self):
         url = "%s%s" % (twitter_statuses_prefix, "public_timeline.json")
