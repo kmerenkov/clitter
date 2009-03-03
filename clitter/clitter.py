@@ -147,14 +147,14 @@ class Clitter(object):
 
         if options.rate_time_limit:
             self.command_rate_limit_status()
-        elif options.add_status:
-            self.command_add(options.add_status)
         elif options.fetch_user:
             self.command_fetch_user_timeline(args[0] if args else None)
         elif options.fetch_friends:
             self.command_fetch_friends_timeline()
         elif options.destroy:
             self.command_destroy(options.destroy)
+        elif options.add_status is not None:
+            self.command_add(options.add_status)
         else:
             parser.print_help()
 
@@ -254,6 +254,20 @@ class Clitter(object):
                 self.print_timeline(prev_timeline)
 
     def command_add(self, status):
+        if not status.strip():
+            if not os.environ.get("EDITOR", None):
+                self.print_error("Empty statuses are not allowed.")
+                self.print_error("EDITOR environment variable is not configured")
+                return
+            import tempfile
+            tmp_handle, tmp_path = tempfile.mkstemp(suffix="_clitter", text=True)
+            os.system("%s %s" % (os.environ["EDITOR"], tmp_path))
+            tmp_file = os.fdopen(tmp_handle)
+            status = tmp_file.read().strip()
+            tmp_file.close()
+            os.remove(tmp_path)
+            self.command_add(status)
+            return
         api = twitter.APIRequest(self.config['twitter.username'], self.config['twitter.password'])
         self.print_progress("Updating status ...")
         json = self.handle_api_response(api.update, status)
